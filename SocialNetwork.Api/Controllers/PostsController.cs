@@ -1,90 +1,103 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using SocialNetwork.Api.Models;
+using SocialNetwork.Api.DataTransferObjects.Post;
+using SocialNetwork.Core.Entities;
+using SocialNetwork.Core.Interfaces;
 
 namespace SocialNetwork.Api.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
     public class PostsController : ControllerBase
     {
-        private SocialNetworkContext context;
+        private readonly IRepository<Post> postRepository;
+        private readonly IRepository<User> userRepository;
 
-        public PostsController(SocialNetworkContext context) { 
-            this.context = context;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="userId">El id del usuario del que se quieren extraer sus posts.</param>
-        /// <returns>Los post para el usuario enviado.</returns>
-        [HttpGet("users/{userId}/[controller]")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult GetPost([FromRoute] int userId)
+        public PostsController(IRepository<Post> postRepository, IRepository<User> userRepository)
         {
-            if (!context.Users.Any())
-                return NotFound("No hay usuarios");
-
-            var user = context.Users.FirstOrDefault(x => x.Id == userId);
-            if (user == null)
-                return NotFound($"No se encontro un usuario con el id {userId}");
-
-            var posts = context.Posts.Where(x => x.UserId == userId);
-            if (!posts.Any())
-                return NotFound($"No existe ningun post para el usuario: {userId}");
-            return Ok(posts);
-            
+            this.postRepository = postRepository;
+            this.userRepository = userRepository;
         }
 
+        //http://localhost:4000/posts/43jkgdsggsdj
         /// <summary>
-        /// 
+        /// Agrega una publicación para el usuario.
         /// </summary>
-        /// <param name="userId">El id del usuario del que se quieren extraer sus posts.</param>
-        /// <returns>Los post para el usuario enviado.</returns>
-        [HttpGet("users/{userId}/[controller]/{postId}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult GetPostById([FromRoute] int userId, [FromRoute] int postId)
-        {
-            if (!context.Users.Any())
-                return NotFound("No hay usuarios");
-
-            var user = context.Users.FirstOrDefault(x => x.Id == userId);
-            if (user == null)
-                return NotFound($"No se encontro un usuario con el id {userId}");
-
-            var posts = context.Posts.Where(x => x.UserId == userId && x.Id == postId);
-            if (!posts.Any())
-                return NotFound($"No existe ningun post para el usuario: {userId}");
-            return Ok(posts);
-        }
-
-
-        /// <summary>
-        /// Agrega una publicacion para el usuario.
-        /// </summary>
-        /// <param name="userId">El id del usuario que agregara la publicacion.</param>
-        /// <param name="post">La publicacion a agregar.</param>
-        /// <returns>La publicacion agregada.</returns>
-        [HttpPost("users/{userId}/Posts")]
+        /// <param name="userId">El id del usuario que agregará la publicación.</param>
+        /// <param name="post">La publicación a agregar.</param>
+        /// <returns>La publicación agregada.</returns>
+        [HttpPost("users/{userId}/[controller]")]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult AddPost([FromRoute] int userId, [FromBody] Post post)
+        public ActionResult<PostDetailDto> AddPost([FromRoute] int userId, [FromBody] PostCreateDto post)
         {
-            var user = context.Users.FirstOrDefault(x => x.Id == userId);
-            if (user == null)
-                return BadRequest($"No se encontro un usuario con el id {userId} para crear e post");
+            var user = this.userRepository.GetById(userId);
+            if (user is null)
+            {
+                return BadRequest($"No se encontró un usuario con id {userId} para crear el post");
+            }
 
             if (string.IsNullOrEmpty(post.Content))
-                return BadRequest("No se puede crear un post sin contenido");
+            {
+                return BadRequest("No se puede crear un post sin contenido.");
+            }
 
-            context.Posts.Add(post);
-            context.SaveChanges();
-            return new CreatedAtActionResult(nameof(GetPostById), "Posts", new { userId = userId, postId = post.Id }, post);
+            var createdPost = this.postRepository.Add(new Post
+            {
+                Content = post.Content,
+                UserId = user.Id
+            });
+            return new CreatedAtActionResult("GetPostById", "Posts", new { userId = userId, postId = createdPost.Id }, new PostDetailDto
+            {
+                Content = createdPost.Content,
+                UserId = createdPost.UserId,
+                Id = createdPost.Id
+            });
+        }
+
+        [HttpGet("users/{userId}/[controller]")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public ActionResult<IEnumerable<PostCreateDto>> GetPosts([FromRoute] int userId)
+        {
+            var user = this.userRepository.GetById(userId);
+            if (user is null)
+            {
+                return BadRequest($"No se encontró un usuario con id {userId}");
+            }
+
+            return Ok(this.postRepository.Filter(x => x.UserId == userId)
+                .Select(x => new PostDetailDto
+                {
+                    Id = x.Id,
+                    Content = x.Content,
+                    UserId = x.UserId
+                }));
+        }
+
+        [HttpGet("users/{userId}/[controller]/{postId}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public ActionResult<PostDetailDto> GetPostById([FromRoute] int userId, int postId)
+        {
+            var user = this.userRepository.GetById(userId);
+            if (user is null)
+            {
+                return BadRequest($"No se encontró un usuario con id {userId}");
+            }
+
+            var post = this.postRepository.GetById(postId);
+            if (post is null)
+            {
+                return NotFound($"No se encontró un post con el id {postId}");
+            }
+            return Ok(new PostDetailDto
+            {
+                Id = post.Id,
+                Content = post.Content,
+                UserId = post.UserId
+            });
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace SocialNetwork.Api.Models
+﻿namespace SocialNetwork.Core.Entities
 {
     public class Post
     {

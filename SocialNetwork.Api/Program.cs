@@ -1,18 +1,21 @@
 using System.Diagnostics;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
-using SocialNetwork.Api;
+using SocialNetwork.Core.Interfaces;
+using SocialNetwork.Infrastructure;
+using SocialNetwork.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 builder.Services.AddDbContext<SocialNetworkContext>(options =>
-  options.UseSqlite("DataSource=socialnetwork.db")
-               .EnableSensitiveDataLogging()
-               .LogTo(message => Debug.Write(message))
+            options.UseSqlite("DataSource=socialnetwork.db")
+            .EnableSensitiveDataLogging()
+            .LogTo(message => Debug.Write(message))
 );
 
+builder.Services.AddScoped(typeof(IRepository<>), typeof(BaseRepository<>));
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

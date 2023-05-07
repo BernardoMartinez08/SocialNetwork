@@ -1,70 +1,104 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using SocialNetwork.Api.Models;
-using System.Xml.Linq;
+using SocialNetwork.Api.DataTransferObjects.Post;
+using SocialNetwork.Api.DataTransferObjects.User;
+using SocialNetwork.Core.Entities;
+using SocialNetwork.Core.Interfaces;
 
+namespace SocialNetwork.Api.Controllers;
 
-namespace SocialNetwork.Api.Controllers
+[ApiController]
+[Route("[controller]")]
+public class UsersController : ControllerBase
 {
-    [ApiController]
-    [Route("[controller]")]
-    public class UserController : ControllerBase
+    private readonly IRepository<User> userRepository;
+
+    public UsersController(IRepository<User> userRepository)
     {
-        private SocialNetworkContext context;
+        this.userRepository = userRepository;
+    }
 
-        public UserController(SocialNetworkContext context)
+    //https://localhost:50670/users?username=a
+    [HttpGet(Name = "GetUsers")]
+    public ActionResult<IEnumerable<UserListDto>> GetUsers([FromQuery] string? username)
+    {
+        if (string.IsNullOrEmpty(username))
         {
-            this.context = context;
+            return Ok(userRepository.Get()
+                .Select(x => new UserListDto
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    Username = x.Username
+                }));
         }
-
-        [HttpGet(Name = "GetUsers")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult Get([FromQuery] string ? username)
+        var users = userRepository.Filter(x => x.Username.StartsWith(username));
+        return Ok(users.Select(x => new UserListDto
         {
-            if (!context.Users.Any())
-                return NotFound("No hay usuarios");
+            Id = x.Id,
+            Name = x.Name,
+            Username = x.Username
+        }));
+    }
 
-            if (string.IsNullOrEmpty(username))
-                return Ok(context.Users);
-
-            var user = context.Users.Where(x => x.Username.StartsWith(username));
-            if (!user.Any())
-                return NotFound($"No existe ningun usuario con el username: {username}");
-            return Ok(user);
-            
-        }
-
-        [HttpGet("{id}")]
-        [ProducesResponseType(StatusCodes.Status302Found)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult Get(int id)
+    //https://localhost:50670/users/{id}
+    [HttpGet("{id}")]
+    public ActionResult<UserDetailDto> GetUserById(int id)
+    {
+        var user = userRepository.GetById(id);
+        if (user is null)
         {
-            var user = context.Users.First(x => x.Id == id);
-            if (user == null)
-                return NotFound($"No se encontro el usuario con id: {id}");
-            return Ok(user);
-            
+            return BadRequest("No existe el usuario");
         }
-
-        [HttpPost]
-        public IActionResult CreateUser([FromBody] User user)
+        return Ok(new UserDetailDto
         {
-            context.Users.Add(user);
-            context.SaveChanges();
-            return Ok(user);
-            
-        }
+            Id = user.Id,
+            Name = user.Name,
+            Username = user.Username,
+            Posts = user.Posts.Select(x => new PostDetailDto
+            {
+                Id = x.Id,
+                Content = x.Content,
+                UserId = x.UserId
+            }).ToList()
+        });
+    }
 
-        [HttpPut("{id}")]
-        public IActionResult UpdateUser(int id, [FromBody] User user)
+    [HttpPost]
+    public ActionResult<UserDetailDto> CreateUser([FromBody] UserCreateDto userDto)
+    {
+        var user = new User
         {
-            var userToRemove = context.Users.First(x => x.Id == id);
-            context.Users.Remove(userToRemove);
-            context.Users.Add(user);
-            context.SaveChanges();
-            return Ok(user);
-            
-        }
+            Name = userDto.Name,
+            Email = userDto.Email,
+            Username = userDto.Username
+        };
+        var newUser = userRepository.Add(user);
+        return Ok(new UserDetailDto
+        {
+            Id = newUser.Id,
+            Name = newUser.Name,
+            Username = newUser.Username
+        });
+    }
+
+    [HttpPut("{id}")]
+    public ActionResult<UserDetailDto> UpdateUser(int id, [FromBody] UserCreateDto user)
+    {
+        var updatedUser = userRepository.Update(new User
+        {
+            Id = id,
+            Name = user.Name,
+            Username = user.Username
+        });
+
+        return Ok(new UserDetailDto
+        {
+            Id = updatedUser.Id,
+            Name = updatedUser.Name,
+            Username = updatedUser.Username
+        });
     }
 }
+
