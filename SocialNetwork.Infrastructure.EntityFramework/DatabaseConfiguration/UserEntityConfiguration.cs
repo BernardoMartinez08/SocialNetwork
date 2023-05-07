@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SocialNetwork.Core.Entities;
 using System.Reflection.Emit;
 
-namespace SocialNetwork.Infrastructure.DatabaseConfiguration
+namespace SocialNetwork.Infrastructure.EntityFramework.DatabaseConfiguration
 {
     public class UserEntityConfiguration : IEntityTypeConfiguration<User>
     {

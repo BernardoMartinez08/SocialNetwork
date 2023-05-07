@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Core.Entities;
-using SocialNetwork.Infrastructure.DatabaseConfiguration;
+using SocialNetwork.Infrastructure.EntityFramework.DatabaseConfiguration;
 
-namespace SocialNetwork.Infrastructure
+namespace SocialNetwork.Infrastructure.EntityFramework
 {
     public class SocialNetworkContext : DbContext
     {

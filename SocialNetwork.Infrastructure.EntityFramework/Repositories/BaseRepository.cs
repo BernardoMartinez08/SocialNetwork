@@ -1,6 +1,6 @@
 ﻿using SocialNetwork.Core.Interfaces;
 
-namespace SocialNetwork.Infrastructure.Repositories
+namespace SocialNetwork.Infrastructure.EntityFramework.Repositories
 {
     public class BaseRepository<TEntity> : IRepository<TEntity> where TEntity : class
     {
